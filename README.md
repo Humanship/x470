@@ -1,4 +1,4 @@
-# x470 - Proof-of-Human Required
+# x470 Proof-of-Human Required
 
 A minimal HTTP-native protocol for verifying that a request was made by a human before serving protected data.
 
@@ -12,7 +12,8 @@ A minimal HTTP-native protocol for verifying that a request was made by a human 
 
 When a client requests a protected resource, the server can respond with `470` and a JSON challenge describing how to prove humanness (e.g., signing a message with an attested key).
 
-Once the client completes the challenge, it retries the request with the `Proof-Of-Human` header containing the proof object.  
+Once the client completes the challenge, it retries the request with the `Proof-Of-Human` header containing the proof object. 
+
 If the proof is valid, the server grants access.
 
 ## Running it
@@ -27,7 +28,7 @@ node index.js
 
 Then open the HTML file at `client/index.html`
 
-## How does it work?
+## How does verification work?
 
 We rely on Humanship ID's open protocol to generate Proof-Of-Human signatures, but can be expanded to any Proof-Of-Human protocol.
 
