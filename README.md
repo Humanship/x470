@@ -33,3 +33,12 @@ Then open the HTML file at `client/index.html`
 We rely on Humanship ID's open protocol to generate Proof-Of-Human signatures, but can be expanded to any Proof-Of-Human protocol.
 
 [Humanship ID](https://humanship.id) lets users verify their personhood through their phone in a trustless and decentralized way. Currently on closed beta, you can reach out on [@humanship_id](https://x.com/humanship_id) to get access to the Testflight app.
+
+## Under construction
+
+Verification part is working, but dummy at the moment, until the Humanship ID protocol is fully implemented in it. Where we need to verify that the signature comes from a verified pubkey.
+
+There are two ways to create the proof's signature:
+
+- Either the proof was linked to a Solana wallet, having the wallet to sign the challenge
+- Or the proof lives on the user's phone, where a challenge needs to be completed through a QR code scan (an ephemeral keypair can be generated, to keep signing challenges for a certain period of time)
