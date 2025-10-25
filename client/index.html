@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>x470 Proof-Of-Human Client</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Roboto, "Helvetica Neue", Arial; padding: 20px; max-width: 900px; margin: auto; }
+    pre { background:#0f172a; color:#e6eef8; padding:12px; border-radius:8px; overflow:auto; }
+    button { padding:10px 14px; margin:6px 0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; }
+    .good { color: #0b6623; }
+    .bad { color: #8b0000; }
+  </style>
+</head>
+<body>
+  <h1>x470 Proof-Of-Human</h1>
+  <p>This page tests a Proof-Of-Human implementation built at the HTTP level, fetches a challenge from <code>/secret</code>, signs it and retries the request with the <code>Proof-Of-Human</code> header.</p>
+
+  <button id="gen">Generate Keypair</button>
+  <button id="try" disabled>Request /secret (challenge → sign → verify)</button>
+  <div id="info"></div>
+
+  <h3>Logs</h3>
+  <pre id="log" class="mono"></pre>
+
+  <!-- tweetnacl is not ESM -->
+  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+
+  <script type="module">
+  import bs58 from 'https://cdn.jsdelivr.net/npm/bs58@6.0.0/+esm';
+
+  // ---------- helpers ----------
+  const $ = id => document.getElementById(id);
+  const logEl = $('log');
+  function log(...args) {
+    logEl.textContent += args.map(a =>
+      typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
+    ).join(' ') + "\n";
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const b64urlEncode = (input) => {
+    let b64;
+    if (typeof input === 'string') {
+      b64 = btoa(unescape(encodeURIComponent(input)));
+    } else {
+      // Uint8Array -> binary string
+      let s = '';
+      for (let i = 0; i < input.length; i++) s += String.fromCharCode(input[i]);
+      b64 = btoa(s);
+    }
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const PROTOCOL = "http"
+  const b64urlEncodeJson = (obj) => b64urlEncode(JSON.stringify(obj));
+  const getResourceUrl = path => `${PROTOCOL}://${location.host}${path}`;
+  async function safeJson(resp) {
+    try { return await resp.json(); } catch { return await resp.text(); }
+  }
+
+  // ---------- state ----------
+  let keypair = null;
+  const CHALLENGE_PATH = 'localhost:4700/secret';
+
+
+  $('gen').addEventListener('click', (e) => {
+    e.target.style.display = 'none';
+    keypair = nacl.sign.keyPair();
+    const pub58 = bs58.encode(keypair.publicKey);
+    const secretPreview = bs58.encode(keypair.secretKey.slice(0, 32));
+    $('info').innerHTML = `
+      <br><b>Generated keypair</b><br><br>
+      PubKey: <code class="mono">${pub58}</code><br>
+      Secret: <code class="mono">${secretPreview}</code>
+    `;
+    $('try').disabled = false;
+    log('Generated pubkey:', pub58);
+  });
+
+  $('try').addEventListener('click', async () => {
+    if (!keypair) return alert('Generate a keypair first.');
+    log('');
+    log('--- Starting challenge flow ---');
+
+    const challengeUrl = getResourceUrl(CHALLENGE_PATH);
+    
+    let r1;
+    try { r1 = await fetch(challengeUrl); } catch (err) { return log('Network error:', err); }
+
+    if (r1.status !== 470) {
+      log('Unexpected status', r1.status);
+      log(await safeJson(r1));
+      return;
+    }
+
+    const challenge = await r1.json();
+    log('Challenge JSON:', challenge);
+
+    const { nonce } = challenge;
+    const resource = `${PROTOCOL}://${location.host}${CHALLENGE_PATH}`;
+    const timestamp = Date.now();
+    const message = `${timestamp}|${resource}|${nonce}`;
+    const msgBytes = new TextEncoder().encode(message);
+    const sig = nacl.sign.detached(msgBytes, keypair.secretKey);
+
+    const headerPayload = {
+      pubkey: bs58.encode(keypair.publicKey),
+      signature: bs58.encode(sig),
+      timestamp,
+      nonce
+    };
+    const headerValue = 'v1 ' + b64urlEncodeJson(headerPayload);
+
+    log('Sending proof header...');
+    const r2 = await fetch(challengeUrl, { headers: { 'Proof-Of-Human': headerValue } });
+    log('Status:', r2.status);
+    log('Body:', await safeJson(r2));
+  });
+  </script>
+</body>
+</html>
